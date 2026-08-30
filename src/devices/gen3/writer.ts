@@ -505,6 +505,13 @@ export function makeWriter(opts: {
           );
         }
       }
+      // The editor emits a cell-select companion (fn=0x01 sub=0x30, gridPos
+      // only) BEFORE the insert (sub=0x32). The FM3 firmware arms the target
+      // cell from the select, so a bare insert is a silent no-op. This was
+      // hardware-verified on FM3 (2026-08-30): sub=0x30 + sub=0x32 places the
+      // block; sub=0x32 alone does not.
+      const selectBytes = codec.buildClearBlock({ row: slot.row, col: slot.col, rows: grid.rows });
+      await sendAndWatchForError(ctx, selectBytes);
       const bytes = codec.buildSetGridCell({ row: slot.row, col: slot.col, blockId, rows: grid.rows });
       const errorReport = await sendAndWatchForError(ctx, bytes);
       // The block insert rides the dual-purpose fn=0x01 (sub=0x32), so the
@@ -528,9 +535,9 @@ export function makeWriter(opts: {
         display_value: blockType === 'none' || blockType === 'empty' ? 'cleared' : change.block_type,
         warning:
           `🟡 ${shape.id} set_block: sent the gen-3 block-insert op ` +
-          '(fn=0x01 sub=0x32, wire-confirmed from the editors). ' +
-          'Device emitted no rejection but device-side persistence is not yet ' +
-          'hardware-verified; confirm by checking the grid layout on the device. ' + BETA_WARNING,
+          '(fn=0x01 sub=0x30 cell-select + sub=0x32 insert). The block placement ' +
+          'is hardware-verified on FM3 (grid read back shows the block); ' +
+          'device-side persistence (save) is a separate op. ' + BETA_WARNING,
       };
     },
 
