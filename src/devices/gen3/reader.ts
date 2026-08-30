@@ -114,6 +114,14 @@ async function collectBlockBulkRead(
   const timer = setTimeout(resolveDone, timeoutMs);
   try {
     ctx.conn.send(codec.buildBlockBulkReadPoll(effectId));
+    // The FM3 buffers the fn=0x1F 0x74/0x75/0x76 burst and only flushes it on
+    // the NEXT inbound frame (hardware-measured via dtrace, 2026-08-30). Send
+    // a synchronous, harmless flush — the editor's own focused-value poll
+    // (fn=0x01 sub=0x03 0x01) — to elicit the burst. Its own small response is
+    // ignored by this collector (it only matches 0x74/0x75/0x76). A short delay
+    // lets the firmware process the poll before the flush arrives.
+    await new Promise((r) => setTimeout(r, 150));
+    ctx.conn.send(codec.buildPollFocusedValue(effectId));
     await done;
   } finally {
     clearTimeout(timer);

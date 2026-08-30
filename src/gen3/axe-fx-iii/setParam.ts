@@ -458,6 +458,36 @@ export function buildGetParameter(
   ], modelByte);
 }
 
+// ── fn=0x01 sub=0x03 0x01 — "focused value" poll / response-flush ─────
+//
+// The FM3 editor's heartbeat poll (`03 01 <effectId> 00 00 …`) reads the
+// block's *currently-focused* param value. Hardware-measured (dtrace,
+// 2026-08-30): this sub-action answers SYNCHRONOUSLY (immediate fn=0x01
+// response), whereas the fn=0x1F bulk-read poll BUFFERS its 0x74/0x75/0x76
+// burst and only flushes it on the NEXT inbound frame. So this frame doubles
+// as the flush that elicits a pending fn=0x1F burst (see collectBlockBulkRead).
+export const SUB_ACTION_POLL_FOCUSED: readonly [number, number] = [0x03, 0x01];
+
+/**
+ * Build the fn=0x01 sub=0x03 0x01 "focused value" poll for `effectId`. The
+ * device replies synchronously with a small fn=0x01 frame carrying the focused
+ * param value. Also used as a harmless flush frame to elicit a buffered
+ * fn=0x1F block-bulk-read burst.
+ */
+export function buildPollFocusedValue(
+  effectId: number,
+  modelByte: number = AXE_FX_III_MODEL_ID,
+): number[] {
+  return buildEnvelope(FN_PARAMETER_SETGET, [
+    ...SUB_ACTION_POLL_FOCUSED,
+    ...encode14(effectId),
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, 0x00,
+  ], modelByte);
+}
+
 /**
  * GET CURRENT TYPE NAME (function 0x01, sub-action 0x1F 0x00).
  *
@@ -2320,6 +2350,8 @@ export interface ModernFractalCodec {
   /** CONTINUOUS SET (sub 52 00): `normalized` in [0,1] → float32(normalized) @pos12. */
   buildSetParameterContinuous(effectId: number, paramId: number, normalized: number): number[];
   buildGetParameter(effectId: number, paramId: number): number[];
+  /** fn=0x01 sub=0x03 0x01 "focused value" poll (also flushes a pending fn=0x1F burst). */
+  buildPollFocusedValue(effectId: number): number[];
   /** GET CURRENT TYPE NAME (sub 1F 00): reply decodes via parseGetParameterResponse().displayString. */
   buildRequestCurrentTypeName(effectId: number, typeParamId: number): number[];
   isGetParameterResponse(bytes: readonly number[]): boolean;
@@ -2405,6 +2437,7 @@ export function createModernFractalCodec(
     buildSetParameter: (e, p, v) => buildSetParameter(e, p, v, modelByte),
     buildSetParameterContinuous: (e, p, v) => buildSetParameterContinuous(e, p, v, modelByte),
     buildGetParameter: (e, p) => buildGetParameter(e, p, modelByte),
+    buildPollFocusedValue: (e) => buildPollFocusedValue(e, modelByte),
     buildRequestCurrentTypeName: (e, p) => buildRequestCurrentTypeName(e, p, modelByte),
     buildSetBypass: (e, b) => buildSetBypass(e, b, modelByte),
     buildSetChannel: (e, c) => buildSetChannel(e, c, modelByte),

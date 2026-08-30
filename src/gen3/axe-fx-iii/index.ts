@@ -137,6 +137,7 @@ export {
   buildSetParameter,
   buildSetParameterContinuous,
   buildGetParameter,
+  buildPollFocusedValue,
   buildRequestCurrentTypeName,
   SUB_ACTION_GET_TYPE_NAME,
   buildSetParameterBypass,
