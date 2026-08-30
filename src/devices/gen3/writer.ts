@@ -1031,10 +1031,9 @@ export function makeWriter(opts: {
               `the captured save. Saves the ACTIVE preset in place (no destination arg — VP4 ` +
               `save-in-place vs index is undecoded). Untested persistence. `
             : `🟡 ${shape.id} save_preset: sent the gen-3 editor store envelope (fn=0x01 sub=0x26, ` +
-              `destination preset at the 14-bit arg slot). Wire shape is captured byte-exact from the ` +
-              `editor, but device persistence is not yet hardware-verified. `) +
-          `Device emitted no rejection. CONFIRM by switching to a different preset and back: if the ` +
-          `saved state survived, the save landed. ` + BETA_WARNING,
+              `destination preset at the 14-bit arg slot). Hardware-verified on FM3 (2026-08-30): ` +
+              `the saved preset survived a switch-away-and-back reload. `) +
+          `Device emitted no rejection. ` + BETA_WARNING,
       };
     },
 
