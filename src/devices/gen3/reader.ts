@@ -316,6 +316,13 @@ async function collectGridLayout(
   const timer = setTimeout(resolveDone, timeoutMs);
   try {
     ctx.conn.send(buildRequestGridLayout(codec.modelByte));
+    // The FM3 buffers the sub=0x2E grid reply and only flushes it on the NEXT
+    // inbound frame (hardware-measured via dtrace, 2026-08-30 — same behavior
+    // as the fn=0x1F bulk read). Send a synchronous, harmless flush — the
+    // editor's own focused-value poll — to elicit the grid dump. Its small
+    // response is ignored (this collector only matches the large 0x2E frame).
+    await new Promise((r) => setTimeout(r, 150));
+    ctx.conn.send(codec.buildPollFocusedValue(1));
     await done;
   } finally {
     clearTimeout(timer);

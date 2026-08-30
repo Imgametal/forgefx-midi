@@ -355,7 +355,7 @@ export function makeWriter(opts: {
           `${shape.id} set_param ${blockSlugIn}.${name}: ${err instanceof Error ? err.message : String(err)} ${BETA_WARNING}`,
         );
       }
-      const errorReport = await sendAndWatchForError(ctx, bytes);
+      const errorReport = await sendAndWatchForError(ctx, bytes, 50);
       // fn=0x01 is dual-purpose with no byte-level SET/GET discriminator,
       // so SET handlers mark dirty explicitly; GET handlers don't.
       markDirty(connectionLabel);
