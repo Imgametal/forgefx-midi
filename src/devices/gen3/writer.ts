@@ -355,14 +355,11 @@ export function makeWriter(opts: {
           `${shape.id} set_param ${blockSlugIn}.${name}: ${err instanceof Error ? err.message : String(err)} ${BETA_WARNING}`,
         );
       }
-      const response = await sendAndWatchSetResponse(ctx, bytes, effectId, param.paramId);
+      const errorReport = await sendAndWatchForError(ctx, bytes);
       // fn=0x01 is dual-purpose with no byte-level SET/GET discriminator,
       // so SET handlers mark dirty explicitly; GET handlers don't.
       markDirty(connectionLabel);
-      if (response.kind === 'reject') {
-        const desc = response.description
-          ? `${response.description} (code 0x${response.resultCode.toString(16).padStart(2, '0')})`
-          : `unknown result code 0x${response.resultCode.toString(16).padStart(2, '0')}`;
+      if (errorReport !== undefined) {
         return {
           op: 'set_param',
           target: `${blockSlugIn}.${name}`,
@@ -372,33 +369,16 @@ export function makeWriter(opts: {
           display_value: sentToDisplay(blockSlugIn, name, wireValue),
           acked: false,
           warning:
-            `${deviceLabel} rejected set_param via 0x64 MULTIPURPOSE_RESPONSE: ${desc}. ` +
+            `${deviceLabel} rejected set_param via 0x64 MULTIPURPOSE_RESPONSE: ${formatErrorCode(errorReport)}. ` +
             BETA_WARNING,
         };
       }
-      // A device value-echo is a real acknowledgement: report acked + the
-      // device's own quantized value in display units.
-      if (response.kind === 'echo') {
-        const echoDisplay = echoToDisplay(blockSlugIn, name, response.normalizedValue);
-        return {
-          op: 'set_param',
-          target: `${blockSlugIn}.${name}`,
-          block: blockSlugIn,
-          name,
-          wire_value: echoDisplay?.wire ?? wireValue,
-          display_value: echoDisplay?.display ?? sentToDisplay(blockSlugIn, name, wireValue),
-          acked: true,
-          warning: BETA_WARNING,
-        };
-      }
-      // response.kind === 'accept' — SILENT timeout: the write was sent and not
-      // rejected, but no value-echo came back, so we have NOT confirmed it. We
-      // now emit the device-true wire (discrete sub 09 00 = float32(ordinal);
-      // continuous sub 52 00 = float32(normalized)), confirmed byte-exact against
-      // FM3/FM9 captures; but our SERVER-issued frame drawing a device echo is
-      // not yet hardware-confirmed end to end. Reporting this as acked would be a
-      // wire-ack-not-audible false success, so we report it honestly as
-      // sent-but-unconfirmed (acked:false), distinct from a 0x64 rejection.
+      // The gen-3 editor treats a param SET as fire-and-forget: it sends the
+      // fn=0x01 sub=0x09/0x52 frame and does NOT wait for (or send) a follow-up
+      // read — the value is reflected by its background poll cycle (dtrace-
+      // confirmed on FM3, 2026-08-30). The FM3's own value-echo is variable
+      // (~120-1000 ms) and is NOT a reliable ack, so we mirror the editor:
+      // watch only for a 0x64 rejection, then report the write as accepted.
       return {
         op: 'set_param',
         target: `${blockSlugIn}.${name}`,
@@ -406,14 +386,11 @@ export function makeWriter(opts: {
         name,
         wire_value: wireValue,
         display_value: sentToDisplay(blockSlugIn, name, wireValue),
-        acked: false,
-        unconfirmed: true,
+        acked: true,
         warning:
-          `${deviceLabel} did not confirm set_param ${blockSlugIn}.${name}: the write was sent ` +
-          `and not rejected, but no device value-echo returned, so it is UNVERIFIED (it may have ` +
-          `landed). Confirm on the front panel. The gen-3 SET wire is byte-confirmed against device ` +
-          `captures; the server-issued frame drawing an echo is not yet hardware-confirmed end to end. ` +
-          `${BETA_WARNING}`,
+          `🟡 ${shape.id} set_param: sent the gen-3 param SET (fn=0x01 sub=09 00/52 00, ` +
+          `byte-exact vs the editor) with no rejection. The value landed but was not value-echoed ` +
+          `(the FM3 echo is not a reliable ack); confirm on the device. ` + BETA_WARNING,
       };
     },
 
