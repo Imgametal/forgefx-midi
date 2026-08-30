@@ -204,10 +204,13 @@ export function makeWriter(opts: {
     effectId: number,
     paramId: number,
     // Per-param SET is on the apply_preset hot path, so this window is kept
-    // tighter than the structural-op window, but still above the 30-60 ms
-    // round-trip so a 0x64 rejection is not missed. An inbound value-echo or
-    // rejection resolves early; only the silent-accept path waits the window.
-    windowMs = 120,
+    // tighter than the structural-op window, but still above the round-trip so
+    // a 0x64 rejection is not missed. Hardware-measured on FM3 (2026-08-30):
+    // the value-echo lands ~120-1000 ms after the send (variable, tied to the
+    // device's internal poll cycle), so a 120 ms window races it. An inbound
+    // value-echo or rejection resolves early; only the silent-accept path
+    // waits the window.
+    windowMs = 1000,
   ): Promise<
     | { kind: 'reject'; resultCode: number; description?: string }
     | { kind: 'echo'; normalizedValue: number }

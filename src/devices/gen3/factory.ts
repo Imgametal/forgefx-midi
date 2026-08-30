@@ -75,8 +75,10 @@ import { createModernCatalog, type AxeFxIIIParam, type DeviceRangeTable } from '
 import { makeReader } from './reader.js';
 import { makeWriter } from './writer.js';
 
-/** Wire response window — same budget the III device-namespaced tools use. */
-const GET_RESPONSE_TIMEOUT_MS = 800;
+/** Wire response window — same budget the III device-namespaced tools use.
+ *  Raised to 6000 ms (2026-08-30): the FM3 fn=0x1F block-bulk-read head
+ *  arrives ~4 s after the poll (hardware-measured), so 800 ms raced it. */
+const GET_RESPONSE_TIMEOUT_MS = 6000;
 
 /**
  * Per-device config passed to `createModernFractalDescriptor`. One of
